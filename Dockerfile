@@ -33,21 +33,30 @@ COPY certs /etc/ssl/certs
 
 # --- Stage 4: supervisord config ---
 RUN mkdir -p /etc/supervisor.d
-RUN echo "[supervisord]\nnodaemon=true\n" > /etc/supervisord.conf
 
-RUN echo "[program:nginx]
+# Buat supervisord main conf
+RUN cat <<EOF > /etc/supervisord.conf
+[supervisord]
+nodaemon=true
+EOF
+
+# Buat supervisor program nginx
+RUN cat <<EOF > /etc/supervisor.d/nginx.ini
+[program:nginx]
 command=/usr/sbin/nginx -g 'daemon off;'
 autorestart=true
 stdout_logfile=/dev/stdout
 stderr_logfile=/dev/stderr
-" > /etc/supervisor.d/nginx.ini
+EOF
 
-RUN echo "[program:xray]
+# Buat supervisor program xray
+RUN cat <<EOF > /etc/supervisor.d/xray.ini
+[program:xray]
 command=/usr/local/bin/xray run -c /etc/xray/config.json
 autorestart=true
 stdout_logfile=/dev/stdout
 stderr_logfile=/dev/stderr
-" > /etc/supervisor.d/xray.ini
+EOF
 
 # --- Stage 5: expose port ---
 EXPOSE 443
