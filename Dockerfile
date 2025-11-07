@@ -1,24 +1,12 @@
-# --- Stage 1: base ---
 FROM alpine:3.18
 
-# Set timezone & env
+# Install dependencies
+RUN apk add --no-cache bash curl wget unzip nginx screen ca-certificates tzdata
+
+# Set timezone
 ENV TZ=Asia/Jakarta
 
-# Install dependencies
-RUN apk add --no-cache \
-    curl \
-    bash \
-    tzdata \
-    ca-certificates \
-    nginx \
-    supervisor \
-    openssl \
-    unzip \
-    curl \
-    wget \
-    && mkdir -p /run/nginx
-
-# --- Stage 2: install Xray ---
+# --- Install Xray ---
 RUN XRAY_VER=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | grep tag_name | cut -d '"' -f4) \
     && echo "Downloading Xray version: $XRAY_VER" \
     && wget -O /tmp/xray.zip https://github.com/XTLS/Xray-core/releases/download/${XRAY_VER}/Xray-linux-64.zip \
@@ -26,40 +14,19 @@ RUN XRAY_VER=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/late
     && chmod +x /usr/local/bin/xray \
     && rm -rf /tmp/xray.zip
 
-# --- Stage 3: copy configs ---
+# Copy configs
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
 COPY xray/config.json /etc/xray/config.json
 COPY certs /etc/ssl/certs
 
-# --- Stage 4: supervisord config ---
-RUN mkdir -p /etc/supervisor.d
+# Create folders for nginx
+RUN mkdir -p /run/nginx /var/log/nginx
 
-# Buat supervisord main conf
-RUN cat <<EOF > /etc/supervisord.conf
-[supervisord]
-nodaemon=true
-EOF
-
-# Buat supervisor program nginx
-RUN cat <<EOF > /etc/supervisor.d/nginx.ini
-[program:nginx]
-command=/usr/sbin/nginx -g 'daemon off;'
-autorestart=true
-stdout_logfile=/dev/stdout
-stderr_logfile=/dev/stderr
-EOF
-
-# Buat supervisor program xray
-RUN cat <<EOF > /etc/supervisor.d/xray.ini
-[program:xray]
-command=/usr/local/bin/xray run -c /etc/xray/config.json
-autorestart=true
-stdout_logfile=/dev/stdout
-stderr_logfile=/dev/stderr
-EOF
-
-# --- Stage 5: expose port ---
+# Expose port
 EXPOSE 443
 
-# --- Stage 6: start supervisord ---
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+CMD ["/entrypoint.sh"]
